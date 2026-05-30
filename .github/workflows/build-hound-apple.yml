@@ -41,11 +41,27 @@ jobs:
       - name: Patch React Native tvOS compatibility
         run: |
           ruby <<'RUBY'
-          path = "node_modules/expo-screen-orientation/ios/ScreenOrientationRegistry.swift"
-          source = File.read(path)
-          patched = source.gsub("RCTExecuteOnMainQueue {", "DispatchQueue.main.async {")
-          abort "expected RCTExecuteOnMainQueue calls not found" if source == patched
-          File.write(path, patched)
+          patches = {
+            "node_modules/expo-screen-orientation/ios/ScreenOrientationRegistry.swift" => [
+              ["RCTExecuteOnMainQueue {", "DispatchQueue.main.async {"]
+            ],
+            "modules/mpv-player/ios/MPVLayerRenderer.swift" => [
+              ["if #available(iOS 18.0, *) {", "if #available(iOS 18.0, tvOS 17.0, *) {"]
+            ],
+            "modules/mpv-player/ios/MpvPlayerView.swift" => [
+              [
+                "if #available(iOS 17.0, *) {\n\t\t\tdisplayLayer.wantsExtendedDynamicRangeContent = true\n\t\t}",
+                "#if !os(tvOS)\n\t\tif #available(iOS 17.0, *) {\n\t\t\tdisplayLayer.wantsExtendedDynamicRangeContent = true\n\t\t}\n\t\t#endif"
+              ]
+            ]
+          }
+
+          patches.each do |path, replacements|
+            source = File.read(path)
+            patched = replacements.reduce(source) { |text, (from, to)| text.gsub(from, to) }
+            abort "expected compatibility patch target not found in #{path}" if source == patched
+            File.write(path, patched)
+          end
           RUBY
 
       - name: Build unsigned iOS IPA
