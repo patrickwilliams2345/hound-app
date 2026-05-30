@@ -48,6 +48,7 @@ jobs:
             -scheme "$SCHEME" \
             -configuration Release \
             -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
             -derivedDataPath build/ios \
             CODE_SIGNING_ALLOWED=NO \
             build
@@ -69,6 +70,7 @@ jobs:
             -scheme "$SCHEME" \
             -configuration Release \
             -sdk appletvos \
+            -destination 'generic/platform=tvOS' \
             -derivedDataPath build/tvos \
             CODE_SIGNING_ALLOWED=NO \
             build
