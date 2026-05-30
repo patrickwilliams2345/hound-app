@@ -1,0 +1,84 @@
+name: Build Hound iOS and tvOS
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Get latest upstream release tag
+        id: latest
+        run: |
+          TAG=$(gh release view --repo Hound-Media-Server/hound-app --json tagName --jq .tagName)
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Checkout upstream release
+        uses: actions/checkout@v4
+        with:
+          repository: Hound-Media-Server/hound-app
+          ref: ${{ steps.latest.outputs.tag }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build unsigned iOS IPA
+        run: |
+          npx expo prebuild --clean
+          npx pod-install ios
+
+          SCHEME=$(xcodebuild -list -json -workspace ios/*.xcworkspace | ruby -rjson -e 'puts JSON.parse(STDIN.read)["workspace"]["schemes"][0]')
+
+          xcodebuild \
+            -workspace ios/*.xcworkspace \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build/ios \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+          mkdir -p Payload
+          cp -R build/ios/Build/Products/Release-iphoneos/*.app Payload/
+          zip -r Hound-iOS-${{ steps.latest.outputs.tag }}-unsigned.ipa Payload
+          rm -rf Payload
+
+      - name: Build unsigned tvOS IPA
+        run: |
+          EXPO_TV=1 npx expo prebuild --clean
+          npx pod-install ios
+
+          SCHEME=$(xcodebuild -list -json -workspace ios/*.xcworkspace | ruby -rjson -e 'puts JSON.parse(STDIN.read)["workspace"]["schemes"][0]')
+
+          xcodebuild \
+            -workspace ios/*.xcworkspace \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk appletvos \
+            -derivedDataPath build/tvos \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+          mkdir -p Payload
+          cp -R build/tvos/Build/Products/Release-appletvos/*.app Payload/
+          zip -r Hound-tvOS-${{ steps.latest.outputs.tag }}-unsigned.ipa Payload
+          rm -rf Payload
+
+      - name: Upload IPAs
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hound-Apple-${{ steps.latest.outputs.tag }}-unsigned-IPAs
+          path: |
+            Hound-iOS-*-unsigned.ipa
+            Hound-tvOS-*-unsigned.ipa
