@@ -38,6 +38,16 @@ jobs:
           npm install --no-save expo@55.0.26
           node -p "'expo=' + require('expo/package.json').version + ', expo-modules-core=' + require('expo-modules-core/package.json').version"
 
+      - name: Patch React Native tvOS compatibility
+        run: |
+          ruby <<'RUBY'
+          path = "node_modules/expo-screen-orientation/ios/ScreenOrientationRegistry.swift"
+          source = File.read(path)
+          patched = source.gsub("RCTExecuteOnMainQueue {", "DispatchQueue.main.async {")
+          abort "expected RCTExecuteOnMainQueue calls not found" if source == patched
+          File.write(path, patched)
+          RUBY
+
       - name: Build unsigned iOS IPA
         run: |
           npx expo prebuild --clean
