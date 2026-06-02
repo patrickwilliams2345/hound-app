@@ -1,8 +1,8 @@
 name: Build Hound iOS and tvOS
 
 on:
-  schedule:
-    - cron: "*/30 * * * *"
+  release:
+    types: [published]
   workflow_dispatch:
 
 jobs:
