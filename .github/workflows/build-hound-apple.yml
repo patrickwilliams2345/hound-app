@@ -3,6 +3,8 @@ name: Build Hound iOS and tvOS
 on:
   release:
     types: [published]
+  push:
+    tags: ['*']
   workflow_dispatch:
 
 jobs:
